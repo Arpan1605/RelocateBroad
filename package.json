@@ -8,7 +8,9 @@
     "dev:api": "pnpm --filter @relocateboard/api dev",
     "build:web": "pnpm --filter @relocateboard/web build",
     "build:api": "pnpm --filter @relocateboard/api build",
-    "build:pages": "pnpm --filter @relocateboard/web build:pages"
+    "build:pages": "pnpm --filter @relocateboard/web build:pages",
+    "fetch:jobs": "node scripts/fetch-jobs.mjs apps/web/public/jobs.json",
+    "send:digest": "node scripts/send-daily-digest.mjs apps/web/public/jobs.json"
   },
   "workspaces": [
     "apps/web",

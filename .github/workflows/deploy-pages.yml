@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "30 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -38,6 +40,17 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Fetch live job data
+        run: pnpm run fetch:jobs
+
+      - name: Send daily email digest
+        if: github.event_name == 'schedule'
+        run: pnpm run send:digest
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
 
       - name: Build Angular app
         run: pnpm run build:pages

@@ -1,5 +1,5 @@
 import { AsyncPipe, JsonPipe } from '@angular/common';
-import { provideHttpClient, HttpClient } from '@angular/common/http';
+import { HttpClient, provideHttpClient } from '@angular/common/http';
 import { ApplicationConfig, Component, Injectable, inject } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
@@ -11,7 +11,7 @@ import { ChipModule } from 'primeng/chip';
 import { providePrimeNG } from 'primeng/config';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
-import { catchError, map, of, shareReplay } from 'rxjs';
+import { catchError, map, of, shareReplay, tap } from 'rxjs';
 
 type ApplicationStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected';
 
@@ -24,58 +24,112 @@ interface Job {
   matchScore: number;
   skills: string[];
   url: string;
+  source: string;
   status: ApplicationStatus;
 }
 
-const fallbackJobs: Job[] = [
-  {
-    id: 'sap-product-designer',
-    company: 'SAP',
-    title: 'Product Designer',
-    location: 'Berlin',
-    postedDate: new Date().toISOString(),
-    matchScore: 92,
-    skills: ['Figma', 'Design Systems', 'Product Thinking'],
-    url: 'https://jobs.sap.com',
-    status: 'saved'
-  },
-  {
-    id: 'n26-ux-designer',
-    company: 'N26',
-    title: 'UX Designer',
-    location: 'Berlin / Remote',
-    postedDate: new Date().toISOString(),
-    matchScore: 88,
-    skills: ['Research', 'Figma', 'Mobile UX'],
-    url: 'https://n26.com/en/careers',
-    status: 'applied'
-  },
-  {
-    id: 'celonis-frontend',
-    company: 'Celonis',
-    title: 'Frontend Developer',
-    location: 'Munich',
-    postedDate: new Date(Date.now() - 86400000).toISOString(),
-    matchScore: 81,
-    skills: ['Angular', 'TypeScript', 'Design Systems'],
-    url: 'https://www.celonis.com/careers/',
-    status: 'interview'
-  }
-];
+interface JobsPayload {
+  generatedAt: string;
+  sources: string[];
+  jobs: Job[];
+}
+
+const fallbackPayload: JobsPayload = {
+  generatedAt: new Date().toISOString(),
+  sources: ['Sample'],
+  jobs: [
+    {
+      id: 'sap-product-designer',
+      company: 'SAP',
+      title: 'Product Designer',
+      location: 'Berlin',
+      postedDate: new Date().toISOString(),
+      matchScore: 92,
+      skills: ['Figma', 'Design Systems', 'Product Thinking'],
+      url: 'https://jobs.sap.com',
+      source: 'Sample',
+      status: 'saved'
+    },
+    {
+      id: 'n26-ux-designer',
+      company: 'N26',
+      title: 'UX Designer',
+      location: 'Berlin / Remote',
+      postedDate: new Date().toISOString(),
+      matchScore: 88,
+      skills: ['Research', 'Figma', 'Mobile UX'],
+      url: 'https://n26.com/en/careers',
+      source: 'Sample',
+      status: 'applied'
+    },
+    {
+      id: 'celonis-frontend',
+      company: 'Celonis',
+      title: 'Frontend Developer',
+      location: 'Munich',
+      postedDate: new Date(Date.now() - 86400000).toISOString(),
+      matchScore: 81,
+      skills: ['Angular', 'TypeScript', 'Design Systems'],
+      url: 'https://www.celonis.com/careers/',
+      source: 'Sample',
+      status: 'interview'
+    }
+  ]
+};
 
 @Injectable({ providedIn: 'root' })
 class JobsService {
   private readonly http = inject(HttpClient);
 
-  readonly jobs$ = this.http.get<{ data: Job[] }>('http://localhost:4000/api/jobs').pipe(
-    map((response) => response.data),
-    catchError(() => of(fallbackJobs)),
+  readonly payload$ = this.http.get<JobsPayload>('jobs.json').pipe(
+    catchError(() => of(fallbackPayload)),
     shareReplay({ bufferSize: 1, refCount: true })
   );
+
+  readonly jobs$ = this.payload$.pipe(
+    map((payload) => payload.jobs),
+    tap((jobsList) => this.notifyAboutNewJobs(jobsList))
+  );
+  readonly generatedAt$ = this.payload$.pipe(map((payload) => payload.generatedAt));
+  readonly sources$ = this.payload$.pipe(map((payload) => payload.sources));
+
+  async requestNotificationPermission(): Promise<void> {
+    if ('Notification' in window && Notification.permission === 'default') {
+      await Notification.requestPermission();
+    }
+  }
+
+  private notifyAboutNewJobs(jobsList: Job[]): void {
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+      return;
+    }
+
+    const storageKey = 'relocateboard.seenJobIds';
+    const seenJobs = new Set(JSON.parse(localStorage.getItem(storageKey) ?? '[]') as string[]);
+    const newJobs = jobsList.filter((job) => !seenJobs.has(job.id));
+
+    if (seenJobs.size > 0 && newJobs.length > 0) {
+      const topJob = [...newJobs].sort((first, second) => second.matchScore - first.matchScore)[0];
+      new Notification(`${newJobs.length} new RelocateBoard job${newJobs.length === 1 ? '' : 's'}`, {
+        body: `${topJob.matchScore}% match: ${topJob.company} — ${topJob.title}`
+      });
+    }
+
+    localStorage.setItem(storageKey, JSON.stringify(jobsList.map((job) => job.id)));
+  }
 }
 
 function formatPostedDate(postedDate: string): string {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(new Date(postedDate));
+}
+
+function formatGeneratedAt(generatedAt: string): string {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(generatedAt));
 }
 
 @Component({
@@ -101,10 +155,10 @@ function formatPostedDate(postedDate: string): string {
         <header class="sticky top-0 z-10 border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-slate-500">Personal-first SaaS MVP</p>
+              <p class="text-sm text-slate-500">Daily-updated Germany job radar</p>
               <h2 class="text-xl font-bold text-ink">Find, score, and track Germany roles</h2>
             </div>
-            <button pButton label="Import Job" icon="pi pi-plus" class="hidden sm:inline-flex"></button>
+            <button pButton label="Enable Alerts" icon="pi pi-bell" class="hidden sm:inline-flex" (click)="enableAlerts()"></button>
           </div>
         </header>
         <section class="p-6">
@@ -114,7 +168,13 @@ function formatPostedDate(postedDate: string): string {
     </div>
   `
 })
-class AppComponent {}
+class AppComponent {
+  private readonly jobsService = inject(JobsService);
+
+  enableAlerts(): void {
+    void this.jobsService.requestNotificationPermission();
+  }
+}
 
 @Component({
   selector: 'rb-dashboard',
@@ -123,11 +183,13 @@ class AppComponent {}
   template: `
     <div class="grid gap-6">
       <section class="grid gap-4 md:grid-cols-5">
-        @for (metric of metrics; track metric.label) {
-          <p-card>
-            <p class="text-sm text-slate-500">{{ metric.label }}</p>
-            <p class="mt-2 text-3xl font-bold text-ink">{{ metric.value }}</p>
-          </p-card>
+        @if (metrics$ | async; as metrics) {
+          @for (metric of metrics; track metric.label) {
+            <p-card>
+              <p class="text-sm text-slate-500">{{ metric.label }}</p>
+              <p class="mt-2 text-3xl font-bold text-ink">{{ metric.value }}</p>
+            </p-card>
+          }
         }
       </section>
 
@@ -139,7 +201,7 @@ class AppComponent {}
               <div>
                 <p class="text-lg font-semibold">{{ topJob.company }}</p>
                 <h3 class="mt-1 text-3xl font-bold">{{ topJob.title }}</h3>
-                <p class="mt-2 text-slate-500">{{ topJob.location }} · Posted {{ formatDate(topJob.postedDate) }}</p>
+                <p class="mt-2 text-slate-500">{{ topJob.location }} · {{ topJob.source }} · Posted {{ formatDate(topJob.postedDate) }}</p>
               </div>
               <div class="min-w-52">
                 <p class="mb-2 text-sm font-medium text-slate-600">Match Score: {{ topJob.matchScore }}%</p>
@@ -150,12 +212,18 @@ class AppComponent {}
         </p-card>
 
         <p-card>
-          <ng-template pTemplate="title">Profile Fit</ng-template>
+          <ng-template pTemplate="title">Live Feed</ng-template>
           <div class="space-y-3">
             <p-tag value="UX/UI Designer" severity="info"></p-tag>
             <p-tag value="Angular" severity="success"></p-tag>
             <p-tag value="English roles" severity="secondary"></p-tag>
           </div>
+          @if (generatedAt$ | async; as generatedAt) {
+            <p class="mt-5 text-sm text-slate-500">Last updated: {{ formatGeneratedAt(generatedAt) }}</p>
+          }
+          @if (sources$ | async; as sources) {
+            <p class="mt-2 text-sm text-slate-500">Sources: {{ sources.join(', ') }}</p>
+          }
         </p-card>
       </section>
     </div>
@@ -165,14 +233,25 @@ class DashboardComponent {
   private readonly jobsService = inject(JobsService);
 
   readonly topJob$ = this.jobsService.jobs$.pipe(map((jobList) => jobList[0]));
+  readonly metrics$ = this.jobsService.jobs$.pipe(
+    map((jobList) => {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const weekStart = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+
+      return [
+        { label: 'New Today', value: jobList.filter((job) => new Date(job.postedDate).getTime() >= todayStart).length },
+        { label: 'New This Week', value: jobList.filter((job) => new Date(job.postedDate).getTime() >= weekStart).length },
+        { label: 'Saved', value: jobList.filter((job) => job.status === 'saved').length },
+        { label: 'Applied', value: jobList.filter((job) => job.status === 'applied').length },
+        { label: 'Interviews', value: jobList.filter((job) => job.status === 'interview').length }
+      ];
+    })
+  );
+  readonly generatedAt$ = this.jobsService.generatedAt$;
+  readonly sources$ = this.jobsService.sources$;
   readonly formatDate = formatPostedDate;
-  readonly metrics = [
-    { label: 'New Today', value: 18 },
-    { label: 'New This Week', value: 74 },
-    { label: 'Saved', value: 23 },
-    { label: 'Applied', value: 12 },
-    { label: 'Interviews', value: 2 }
-  ];
+  readonly formatGeneratedAt = formatGeneratedAt;
 }
 
 @Component({
@@ -211,7 +290,7 @@ class DashboardComponent {
                 <div>
                   <p class="text-sm font-semibold uppercase tracking-[0.2em] text-brand">{{ job.company }}</p>
                   <h3 class="mt-2 text-2xl font-bold">{{ job.title }}</h3>
-                  <p class="mt-1 text-slate-500">{{ job.location }} · Posted {{ formatDate(job.postedDate) }}</p>
+                  <p class="mt-1 text-slate-500">{{ job.location }} · {{ job.source }} · Posted {{ formatDate(job.postedDate) }}</p>
                   <div class="mt-4 flex flex-wrap gap-2">
                     @for (skill of job.skills; track skill) {
                       <span class="rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">✔ {{ skill }}</span>
@@ -230,7 +309,7 @@ class DashboardComponent {
             </p-card>
           } @empty {
             <p-card>
-              <p class="text-slate-500">No jobs found yet. Import your first Germany role to begin.</p>
+              <p class="text-slate-500">No jobs found yet. The next scheduled fetch will try again.</p>
             </p-card>
           }
         }
@@ -310,7 +389,7 @@ class SettingsComponent {
     scoring: {
       roleMatch: '40%',
       skillsMatch: '30%',
-      experienceMatch: '20%',
+      locationMatch: '20%',
       languageMatch: '10%'
     }
   };

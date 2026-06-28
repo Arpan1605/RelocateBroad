@@ -57,3 +57,17 @@ npm run dev:api
 
 Sprint 1 focuses on a manual but polished workflow. Sprint 2 can add automatic job fetching, match scoring, and daily summaries.
 
+## Live Job Updates
+
+The GitHub Pages deployment runs every day at 03:30 UTC and refreshes `jobs.json` from:
+
+- Arbeitnow
+- Remote OK
+
+The frontend reads that generated static feed and can show browser notifications for newly seen jobs after the user clicks **Enable Alerts**.
+
+For daily email summaries, add these repository secrets in GitHub:
+
+- `RESEND_API_KEY`
+- `NOTIFICATION_EMAIL`
+- `FROM_EMAIL` optional
