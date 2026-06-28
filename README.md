@@ -68,7 +68,7 @@ The frontend reads that generated static feed and can show browser notifications
 
 LinkedIn, Indeed, and XING are included as partner-gated portal shortcuts. Their automated job APIs require approved partner or publisher access, so RelocateBoard does not scrape them.
 
-For daily email summaries, add these repository secrets in GitHub:
+For new-job email alerts, add these repository secrets in GitHub. The scheduled workflow compares the newly fetched feed against the previously deployed `jobs.json` and sends mail only when new job IDs appear:
 
 - `RESEND_API_KEY`
 - `NOTIFICATION_EMAIL`

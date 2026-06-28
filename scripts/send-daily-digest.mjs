@@ -4,19 +4,35 @@ import { resolve } from 'node:path';
 const apiKey = process.env.RESEND_API_KEY;
 const notificationEmail = process.env.NOTIFICATION_EMAIL;
 const fromEmail = process.env.FROM_EMAIL ?? 'RelocateBoard <onboarding@resend.dev>';
-const jobsPath = resolve(process.cwd(), process.argv[2] ?? 'apps/web/public/jobs.json');
+const scriptArgs = process.argv.slice(2).filter((arg) => arg !== '--');
+const jobsPath = resolve(process.cwd(), scriptArgs[0] ?? 'apps/web/public/jobs.json');
+const previousJobsPath = resolve(process.cwd(), scriptArgs[1] ?? 'previous-jobs.json');
 
 if (!apiKey || !notificationEmail) {
-  console.log('Skipping email digest because RESEND_API_KEY or NOTIFICATION_EMAIL is missing.');
+  console.log('Skipping email alert because RESEND_API_KEY or NOTIFICATION_EMAIL is missing.');
   process.exit(0);
 }
 
 const payload = JSON.parse(await readFile(jobsPath, 'utf8'));
-const topJobs = payload.jobs.slice(0, 10);
+const previousPayload = await readPreviousPayload();
+
+if (!previousPayload) {
+  console.log('Skipping email alert because no previous deployed feed was available for comparison.');
+  process.exit(0);
+}
+
+const previousJobIds = new Set((previousPayload.jobs ?? []).map((job) => job.id));
+const newJobs = (payload.jobs ?? []).filter((job) => !previousJobIds.has(job.id));
+const topJobs = newJobs.slice(0, 10);
+
+if (topJobs.length === 0) {
+  console.log('Skipping email alert because there are no new jobs.');
+  process.exit(0);
+}
 
 const html = `
   <div style="font-family: Inter, Arial, sans-serif; line-height: 1.5; color: #111827;">
-    <h1>RelocateBoard daily Germany job digest</h1>
+    <h1>RelocateBoard found ${topJobs.length} new Germany job match${topJobs.length === 1 ? '' : 'es'}</h1>
     <p>Generated at ${new Date(payload.generatedAt).toLocaleString('en')}</p>
     <p>Sources: ${payload.sources.join(', ')}</p>
     ${topJobs
@@ -44,7 +60,7 @@ const response = await fetch('https://api.resend.com/emails', {
   body: JSON.stringify({
     from: fromEmail,
     to: notificationEmail,
-    subject: `RelocateBoard: ${topJobs.length} top Germany job matches`,
+    subject: `RelocateBoard: ${topJobs.length} new Germany job match${topJobs.length === 1 ? '' : 'es'}`,
     html
   })
 });
@@ -53,4 +69,12 @@ if (!response.ok) {
   throw new Error(`Resend email failed with ${response.status}: ${await response.text()}`);
 }
 
-console.log(`Sent daily digest to ${notificationEmail}`);
+console.log(`Sent ${topJobs.length} new-job alert${topJobs.length === 1 ? '' : 's'} to ${notificationEmail}`);
+
+async function readPreviousPayload() {
+  try {
+    return JSON.parse(await readFile(previousJobsPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}

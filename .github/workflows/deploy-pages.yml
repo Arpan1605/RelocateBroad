@@ -41,12 +41,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Download previous job feed
+        if: github.event_name == 'schedule'
+        run: curl -fsSL "https://arpan1605.github.io/RelocateBroad/jobs.json" -o previous-jobs.json || true
+
       - name: Fetch live job data
         run: pnpm run fetch:jobs
 
       - name: Send daily email digest
         if: github.event_name == 'schedule'
-        run: pnpm run send:digest
+        run: pnpm run send:digest -- apps/web/public/jobs.json previous-jobs.json
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
