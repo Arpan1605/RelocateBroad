@@ -1,0 +1,16 @@
+{
+  "name": "relocateboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Germany relocation job dashboard for designers and frontend professionals.",
+  "scripts": {
+    "dev:web": "pnpm --filter @relocateboard/web start",
+    "dev:api": "pnpm --filter @relocateboard/api dev",
+    "build:web": "pnpm --filter @relocateboard/web build",
+    "build:api": "pnpm --filter @relocateboard/api build"
+  },
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ]
+}
