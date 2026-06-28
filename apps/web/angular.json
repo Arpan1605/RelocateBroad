@@ -27,7 +27,8 @@
                 "glob": "**/*",
                 "input": "public"
               }
-            ]
+            ],
+            "outputHashing": "all"
           }
         },
         "serve": {
@@ -40,4 +41,3 @@
     }
   }
 }
-

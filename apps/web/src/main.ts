@@ -81,7 +81,7 @@ const fallbackPayload: JobsPayload = {
 class JobsService {
   private readonly http = inject(HttpClient);
 
-  readonly payload$ = this.http.get<JobsPayload>('jobs.json').pipe(
+  readonly payload$ = this.http.get<JobsPayload>(`jobs.json?v=${Date.now()}`).pipe(
     catchError(() => of(fallbackPayload)),
     shareReplay({ bufferSize: 1, refCount: true })
   );
@@ -213,6 +213,13 @@ class AppComponent {
 
         <p-card>
           <ng-template pTemplate="title">Live Feed</ng-template>
+          @if (jobCount$ | async; as jobCount) {
+            <div class="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p class="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">Live Data Active</p>
+              <p class="mt-1 text-2xl font-bold text-emerald-950">{{ jobCount }} fetched opportunities</p>
+              <p class="mt-1 text-sm text-emerald-800">This page refreshes from the generated job feed every day.</p>
+            </div>
+          }
           <div class="space-y-3">
             <p-tag value="UX/UI Designer" severity="info"></p-tag>
             <p-tag value="Angular" severity="success"></p-tag>
@@ -233,6 +240,7 @@ class DashboardComponent {
   private readonly jobsService = inject(JobsService);
 
   readonly topJob$ = this.jobsService.jobs$.pipe(map((jobList) => jobList[0]));
+  readonly jobCount$ = this.jobsService.jobs$.pipe(map((jobList) => jobList.length));
   readonly metrics$ = this.jobsService.jobs$.pipe(
     map((jobList) => {
       const now = new Date();
