@@ -7,7 +7,8 @@
     "dev:web": "pnpm --filter @relocateboard/web start",
     "dev:api": "pnpm --filter @relocateboard/api dev",
     "build:web": "pnpm --filter @relocateboard/web build",
-    "build:api": "pnpm --filter @relocateboard/api build"
+    "build:api": "pnpm --filter @relocateboard/api build",
+    "build:pages": "pnpm --filter @relocateboard/web build:pages"
   },
   "workspaces": [
     "apps/web",
