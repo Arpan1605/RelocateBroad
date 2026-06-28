@@ -175,6 +175,23 @@ async function main() {
   const payload = {
     generatedAt: new Date().toISOString(),
     sources: ['Arbeitnow', 'Remote OK'],
+    partnerSources: [
+      {
+        name: 'LinkedIn',
+        status: 'Partner access required',
+        searchUrl: 'https://www.linkedin.com/jobs/search/?keywords=UX%20UI%20Designer%20Angular&location=Germany'
+      },
+      {
+        name: 'Indeed',
+        status: 'Publisher or partner access required',
+        searchUrl: 'https://de.indeed.com/jobs?q=UX+UI+Designer+Angular&l=Germany'
+      },
+      {
+        name: 'XING',
+        status: 'Partner API access required',
+        searchUrl: 'https://www.xing.com/jobs/search?keywords=UX%20UI%20Designer%20Angular&location=Germany'
+      }
+    ],
     profile: {
       role: 'UX/UI Designer',
       skills: ['Figma', 'Adobe XD', 'Angular', 'HTML', 'CSS', 'Design Systems']

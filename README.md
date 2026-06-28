@@ -66,6 +66,8 @@ The GitHub Pages deployment runs every day at 03:30 UTC and refreshes `jobs.json
 
 The frontend reads that generated static feed and can show browser notifications for newly seen jobs after the user clicks **Enable Alerts**.
 
+LinkedIn, Indeed, and XING are included as partner-gated portal shortcuts. Their automated job APIs require approved partner or publisher access, so RelocateBoard does not scrape them.
+
 For daily email summaries, add these repository secrets in GitHub:
 
 - `RESEND_API_KEY`

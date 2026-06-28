@@ -31,12 +31,36 @@ interface Job {
 interface JobsPayload {
   generatedAt: string;
   sources: string[];
+  partnerSources?: PartnerSource[];
   jobs: Job[];
+}
+
+interface PartnerSource {
+  name: string;
+  status: string;
+  searchUrl: string;
 }
 
 const fallbackPayload: JobsPayload = {
   generatedAt: new Date().toISOString(),
   sources: ['Sample'],
+  partnerSources: [
+    {
+      name: 'LinkedIn',
+      status: 'Partner access required',
+      searchUrl: 'https://www.linkedin.com/jobs/search/?keywords=UX%20UI%20Designer%20Angular&location=Germany'
+    },
+    {
+      name: 'Indeed',
+      status: 'Publisher or partner access required',
+      searchUrl: 'https://de.indeed.com/jobs?q=UX+UI+Designer+Angular&l=Germany'
+    },
+    {
+      name: 'XING',
+      status: 'Partner API access required',
+      searchUrl: 'https://www.xing.com/jobs/search?keywords=UX%20UI%20Designer%20Angular&location=Germany'
+    }
+  ],
   jobs: [
     {
       id: 'sap-product-designer',
@@ -92,6 +116,7 @@ class JobsService {
   );
   readonly generatedAt$ = this.payload$.pipe(map((payload) => payload.generatedAt));
   readonly sources$ = this.payload$.pipe(map((payload) => payload.sources));
+  readonly partnerSources$ = this.payload$.pipe(map((payload) => payload.partnerSources ?? []));
 
   async requestNotificationPermission(): Promise<void> {
     if ('Notification' in window && Notification.permission === 'default') {
@@ -233,6 +258,22 @@ class AppComponent {
           }
         </p-card>
       </section>
+
+      <p-card>
+        <ng-template pTemplate="title">Partner-Gated Portals</ng-template>
+        <p class="mb-4 text-sm text-slate-500">These portals are included as compliant shortcuts now. Automated API fetching can be enabled after partner/API access is approved.</p>
+        <div class="grid gap-3 md:grid-cols-3">
+          @if (partnerSources$ | async; as partnerSources) {
+            @for (source of partnerSources; track source.name) {
+              <a class="rounded-2xl border border-slate-200 p-4 transition hover:border-brand hover:bg-slate-50" [href]="source.searchUrl" target="_blank">
+                <p class="font-bold text-ink">{{ source.name }}</p>
+                <p class="mt-1 text-sm text-slate-500">{{ source.status }}</p>
+                <p class="mt-3 text-sm font-semibold text-brand">Open search →</p>
+              </a>
+            }
+          }
+        </div>
+      </p-card>
     </div>
   `
 })
@@ -258,6 +299,7 @@ class DashboardComponent {
   );
   readonly generatedAt$ = this.jobsService.generatedAt$;
   readonly sources$ = this.jobsService.sources$;
+  readonly partnerSources$ = this.jobsService.partnerSources$;
   readonly formatDate = formatPostedDate;
   readonly formatGeneratedAt = formatGeneratedAt;
 }
