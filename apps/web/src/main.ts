@@ -118,10 +118,29 @@ class JobsService {
   readonly sources$ = this.payload$.pipe(map((payload) => payload.sources));
   readonly partnerSources$ = this.payload$.pipe(map((payload) => payload.partnerSources ?? []));
 
-  async requestNotificationPermission(): Promise<void> {
-    if ('Notification' in window && Notification.permission === 'default') {
-      await Notification.requestPermission();
+  async requestNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
+    if (!('Notification' in window)) {
+      return 'unsupported';
     }
+
+    if (Notification.permission === 'granted') {
+      this.sendTestNotification();
+      return 'granted';
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission === 'granted') {
+      this.sendTestNotification();
+    }
+
+    return permission;
+  }
+
+  private sendTestNotification(): void {
+    new Notification('RelocateBoard alerts enabled', {
+      body: 'I will notify you here when new Germany job matches appear.'
+    });
   }
 
   private notifyAboutNewJobs(jobsList: Job[]): void {
@@ -183,7 +202,10 @@ function formatGeneratedAt(generatedAt: string): string {
               <p class="text-sm text-slate-500">Daily-updated Germany job radar</p>
               <h2 class="text-xl font-bold text-ink">Find, score, and track Germany roles</h2>
             </div>
-            <button pButton label="Enable Alerts" icon="pi pi-bell" class="hidden sm:inline-flex" (click)="enableAlerts()"></button>
+            <div class="flex flex-col items-end gap-2">
+              <button pButton label="Enable Alerts" icon="pi pi-bell" class="inline-flex" (click)="enableAlerts()"></button>
+              <p class="text-xs font-medium text-slate-500">{{ alertStatus }}</p>
+            </div>
           </div>
         </header>
         <section class="p-6">
@@ -195,9 +217,27 @@ function formatGeneratedAt(generatedAt: string): string {
 })
 class AppComponent {
   private readonly jobsService = inject(JobsService);
+  alertStatus = 'Browser alerts are off';
 
-  enableAlerts(): void {
-    void this.jobsService.requestNotificationPermission();
+  async enableAlerts(): Promise<void> {
+    const permission = await this.jobsService.requestNotificationPermission();
+
+    if (permission === 'granted') {
+      this.alertStatus = 'Browser alerts enabled';
+      return;
+    }
+
+    if (permission === 'denied') {
+      this.alertStatus = 'Alerts blocked in browser settings';
+      return;
+    }
+
+    if (permission === 'unsupported') {
+      this.alertStatus = 'Alerts are not supported in this browser';
+      return;
+    }
+
+    this.alertStatus = 'Alert permission was dismissed';
   }
 }
 
